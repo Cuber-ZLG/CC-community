@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CC Timer</title>
+<title>CC-community</title>
 <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -675,7 +675,7 @@ html, body {
   <header class="topbar">
     <div class="brand">
       <span class="brand-dot"></span>
-      CC Timer
+      CC-community
     </div>
     <nav class="project-tabs" id="projectTabs"></nav>
     <div class="topbar-actions">
@@ -1058,7 +1058,7 @@ html, body {
 
 <script>
 // ============================================================
-// CC Timer v3 — 魔方计时器
+// CC-community — 魔方社区
 // ============================================================
 
 // ===== 项目定义 =====
@@ -1474,7 +1474,7 @@ window._removeAdmin = async function(userId) {
 };
 
 // ===== 存储 =====
-const STORAGE_KEY = 'cc-timer-data';
+const STORAGE_KEY = 'cc-community-data';
 
 function loadData() {
   try {
@@ -2066,7 +2066,7 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'cc-timer-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = 'cc-community-backup-' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
   showToast('已导出');
