@@ -623,6 +623,49 @@ html, body {
 .sync-stats { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; color: var(--text-dim); line-height: 1.8; }
 .sync-stats strong { color: var(--text); }
 #btnAuth.logged-in { color: var(--accent); }
+
+/* ===== 认证弹窗 ===== */
+.auth-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+.auth-tab { flex: 1; padding: 10px; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; }
+.auth-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.otp-row { display: flex; gap: 10px; }
+.otp-row .manual-input { flex: 1; }
+.otp-row .btn { white-space: nowrap; }
+.btn.full-width { width: 100%; }
+.modal-wide { max-width: 720px; width: 90vw; }
+
+/* ===== 用户主页 ===== */
+.profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.profile-avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--bg-elev-2); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; color: var(--text-dim); border: 2px solid var(--border); }
+.profile-name { font-size: 20px; font-weight: 700; }
+.profile-id { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+.profile-role { font-size: 12px; margin-top: 4px; }
+.profile-role.owner { color: var(--warn); }
+.profile-role.admin { color: var(--accent); }
+.profile-role.member { color: var(--text-dim); }
+.profile-email { font-size: 14px; color: var(--text-dim); padding: 8px 0; }
+.edit-row { display: flex; gap: 10px; }
+.edit-row .manual-input { flex: 1; }
+.divider { height: 1px; background: var(--border); margin: 20px 0; }
+.admin-apply { margin-top: 16px; }
+
+/* ===== 管理员面板 ===== */
+.admin-tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.admin-list { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; }
+.admin-member-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.admin-member-info { display: flex; align-items: center; gap: 10px; }
+.admin-member-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-elev-2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: var(--text-dim); }
+.admin-member-name { font-size: 14px; font-weight: 500; }
+.admin-member-meta { font-size: 12px; color: var(--text-dim); }
+.admin-member-actions { display: flex; gap: 6px; }
+.admin-data-table { margin-top: 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; }
+.admin-data-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.admin-data-table th, .admin-data-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.admin-data-table th { color: var(--text-dim); font-weight: 500; position: sticky; top: 0; background: var(--bg-elev); }
+.role-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+.role-badge.owner { background: var(--warn-dim); color: var(--warn); }
+.role-badge.admin { background: var(--accent-dim); color: var(--accent); }
+.role-badge.member { background: var(--bg-elev-2); color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -849,39 +892,163 @@ html, body {
 <div class="modal-overlay" id="authModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title" id="authModalTitle">登录 / 注册</span>
+      <span class="modal-title" id="authModalTitle">登录</span>
       <button class="icon-btn" id="closeAuth">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
-    <div class="modal-body" id="authBody">
-      <!-- 未登录状态 -->
-      <div id="authLoginForm">
-        <div class="setting-label">邮箱</div>
-        <input type="email" class="manual-input" id="authEmail" placeholder="you@example.com" autocomplete="email">
-        <div class="setting-label" style="margin-top:16px">密码</div>
-        <input type="password" class="manual-input" id="authPassword" placeholder="至少6位" autocomplete="current-password">
-        <div class="auth-error" id="authError"></div>
-        <div class="modal-footer" style="padding:0;margin-top:20px">
-          <button class="btn primary" id="btnLogin">登录</button>
-          <button class="btn" id="btnRegister">注册新账号</button>
+    <div class="modal-body">
+      <!-- 登录方式切换 -->
+      <div id="authLoginView">
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-mode="otp">验证码登录</button>
+          <button class="auth-tab" data-mode="password">密码登录</button>
         </div>
-        <div class="auth-hint">登录后成绩自动云同步，换设备不丢失</div>
-      </div>
-      <!-- 已登录状态 -->
-      <div id="authLoggedIn" style="display:none">
-        <div class="auth-user-info">
-          <div class="auth-avatar" id="authAvatar">U</div>
-          <div>
-            <div class="auth-email" id="authUserEmail"></div>
-            <div class="auth-status">已登录 · 云同步已开启</div>
+        <!-- 验证码登录 -->
+        <div id="otpLoginForm">
+          <div class="setting-label">邮箱</div>
+          <input type="email" class="manual-input" id="otpEmail" placeholder="you@example.com">
+          <div class="setting-label" style="margin-top:14px">验证码</div>
+          <div class="otp-row">
+            <input type="text" class="manual-input" id="otpCode" placeholder="6位验证码" maxlength="6">
+            <button class="btn" id="btnSendOtp">发送验证码</button>
           </div>
+          <div class="auth-error" id="otpError"></div>
+          <button class="btn primary full-width" id="btnOtpLogin" style="margin-top:16px">登录 / 注册</button>
         </div>
-        <div class="sync-stats" id="syncStats"></div>
-        <div class="modal-footer" style="padding:0;margin-top:20px">
-          <button class="btn" id="btnSyncNow">立即同步</button>
-          <button class="btn danger" id="btnLogout">退出登录</button>
+        <!-- 密码登录 -->
+        <div id="passwordLoginForm" style="display:none">
+          <div class="setting-label">账号（邮箱 / ID / 用户名）</div>
+          <input type="text" class="manual-input" id="loginAccount" placeholder="邮箱、ID或用户名">
+          <div class="setting-label" style="margin-top:14px">密码</div>
+          <input type="password" class="manual-input" id="loginPassword" placeholder="密码">
+          <div class="auth-error" id="passwordError"></div>
+          <button class="btn primary full-width" id="btnPasswordLogin" style="margin-top:16px">登录</button>
         </div>
+        <div class="auth-hint">新用户用验证码登录即自动注册，登录后可设置密码和资料</div>
+      </div>
+      <!-- 注册完善资料（首次登录后） -->
+      <div id="authRegisterView" style="display:none">
+        <div class="setting-label">设置昵称</div>
+        <input type="text" class="manual-input" id="regNickname" placeholder="显示名称">
+        <div class="setting-label" style="margin-top:14px">设置ID（唯一，一个月只能改一次）</div>
+        <input type="text" class="manual-input" id="regIdNumber" placeholder="字母数字组合，3-20位">
+        <div class="setting-label" style="margin-top:14px">设置密码</div>
+        <input type="password" class="manual-input" id="regPassword" placeholder="至少6位">
+        <div class="auth-error" id="regError"></div>
+        <button class="btn primary full-width" id="btnCompleteRegister" style="margin-top:16px">完成注册</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 用户主页 ===== -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">个人主页</span>
+      <button class="icon-btn" id="closeProfile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="profile-header">
+        <div class="profile-avatar" id="profileAvatar">U</div>
+        <div class="profile-info">
+          <div class="profile-name" id="profileName"></div>
+          <div class="profile-id" id="profileId"></div>
+          <div class="profile-role" id="profileRole"></div>
+        </div>
+      </div>
+      <div class="setting-label" style="margin-top:20px">昵称</div>
+      <div class="edit-row">
+        <input type="text" class="manual-input" id="editNickname">
+        <button class="btn" id="btnSaveNickname">保存</button>
+      </div>
+      <div class="setting-label" style="margin-top:16px">ID号</div>
+      <div class="edit-row">
+        <input type="text" class="manual-input" id="editIdNumber">
+        <button class="btn" id="btnSaveIdNumber">保存</button>
+      </div>
+      <div class="auth-hint" id="idChangeHint"></div>
+      <div class="setting-label" style="margin-top:16px">邮箱</div>
+      <div class="profile-email" id="profileEmail"></div>
+      <div class="setting-label" style="margin-top:16px">修改密码</div>
+      <div class="edit-row">
+        <input type="password" class="manual-input" id="editPassword" placeholder="新密码">
+        <button class="btn" id="btnSavePassword">修改</button>
+      </div>
+      <div class="modal-footer" style="padding:0;margin-top:20px">
+        <button class="btn" id="btnOpenAdmin" style="display:none">管理员面板</button>
+        <button class="btn" id="btnOpenOwner" style="display:none">所有者面板</button>
+        <button class="btn danger" id="btnLogout2">退出登录</button>
+      </div>
+      <!-- 管理员申请入口 -->
+      <div class="admin-apply" id="adminApplySection" style="display:none">
+        <div class="divider"></div>
+        <div class="setting-label">申请管理员</div>
+        <div class="edit-row">
+          <input type="text" class="manual-input" id="applyCode" placeholder="输入申请码">
+          <button class="btn primary" id="btnApplyAdmin">申请</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 管理员面板 ===== -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <span class="modal-title">管理员面板</span>
+      <button class="icon-btn" id="closeAdmin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="admin-tabs">
+        <button class="auth-tab active" data-admin-tab="members">成员管理</button>
+        <button class="auth-tab" data-admin-tab="data">数据表</button>
+      </div>
+      <div id="adminMembersView">
+        <div class="admin-list" id="adminMemberList"></div>
+      </div>
+      <div id="adminDataView" style="display:none">
+        <div class="setting-label">选择表</div>
+        <select class="select" id="adminTableSelect">
+          <option value="profiles">profiles（用户资料）</option>
+          <option value="solves">solves（成绩记录）</option>
+          <option value="site_settings">site_settings（站点设置）</option>
+        </select>
+        <button class="btn" id="btnLoadTable" style="margin-top:10px">加载数据</button>
+        <div class="admin-data-table" id="adminDataTable"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 所有者面板 ===== -->
+<div class="modal-overlay" id="ownerModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">所有者面板</span>
+      <button class="icon-btn" id="closeOwner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="setting-label">管理员列表</div>
+      <div class="admin-list" id="ownerAdminList"></div>
+      <div class="setting-label" style="margin-top:20px">添加管理员（输入用户ID或邮箱）</div>
+      <div class="edit-row">
+        <input type="text" class="manual-input" id="addAdminInput" placeholder="用户ID或邮箱">
+        <button class="btn primary" id="btnAddAdmin">添加</button>
+      </div>
+      <div class="divider"></div>
+      <div class="setting-label">修改管理员申请码</div>
+      <div class="edit-row">
+        <input type="text" class="manual-input" id="editInviteCode">
+        <button class="btn" id="btnSaveInviteCode">保存</button>
       </div>
     </div>
   </div>
@@ -939,10 +1106,11 @@ const state = {
   syncing: false,   // 是否正在同步
 };
 
-// ===== Supabase 云同步 =====
+// ===== Supabase 云同步 + 用户系统 =====
 const SUPABASE_URL = 'https://lgpzoawawmqpscebrhdr.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iT0fDX-C64_4pWUYwMqtxg_sny2x8';
 let supabaseClient = null;
+let currentProfile = null; // 当前用户的profiles记录
 
 function initSupabase() {
   if (typeof supabase !== 'undefined' && supabase.createClient) {
@@ -955,90 +1123,216 @@ function initSupabase() {
   return false;
 }
 
+// 加载用户资料
+async function loadProfile() {
+  if (!state.user || !supabaseClient) return null;
+  const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', state.user.id).single();
+  if (!error && data) {
+    currentProfile = data;
+    return data;
+  }
+  return null;
+}
+
 // 检查登录状态
 async function checkAuth() {
   if (!supabaseClient) return;
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
     state.user = session.user;
+    await loadProfile();
     updateAuthUI();
     await pullFromCloud();
   }
-  // 监听登录状态变化
-  supabaseClient.auth.onAuthStateChange((_event, session) => {
+  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     state.user = session?.user || null;
+    if (state.user) {
+      await loadProfile();
+      await pullFromCloud();
+    } else {
+      currentProfile = null;
+    }
     updateAuthUI();
-    if (state.user) pullFromCloud();
   });
 }
 
 function updateAuthUI() {
   const btn = document.getElementById('btnAuth');
-  const loginForm = document.getElementById('authLoginForm');
-  const loggedIn = document.getElementById('authLoggedIn');
   if (state.user) {
     btn.classList.add('logged-in');
-    loginForm.style.display = 'none';
-    loggedIn.style.display = 'block';
-    document.getElementById('authUserEmail').textContent = state.user.email;
-    document.getElementById('authAvatar').textContent = state.user.email[0].toUpperCase();
-    updateSyncStats();
   } else {
     btn.classList.remove('logged-in');
-    loginForm.style.display = 'block';
-    loggedIn.style.display = 'none';
   }
 }
 
-function updateSyncStats() {
-  const el = document.getElementById('syncStats');
-  let total = 0;
-  for (const p in state.solves) total += state.solves[p].length;
-  el.innerHTML = `本地成绩：<strong>${total}</strong> 条<br>云同步：<strong>${state.syncing ? '同步中...' : '已开启'}</strong>`;
+// 判断是否新用户（没有设置ID号）
+function isNewUser() {
+  return currentProfile && (!currentProfile.id_number || currentProfile.id_number === '');
 }
 
-// 登录
-async function doLogin(email, password) {
+// ===== 验证码登录 =====
+async function sendOtp(email) {
+  const { error } = await supabaseClient.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) throw error;
+}
+
+async function verifyOtp(email, token) {
+  const { data, error } = await supabaseClient.auth.verifyOtp({ email, token, type: 'email' });
+  if (error) throw error;
+  state.user = data.user;
+  await loadProfile();
+  return data;
+}
+
+// ===== 密码登录（支持邮箱/ID/用户名） =====
+async function passwordLogin(account, password) {
+  let email = account;
+  // 如果不是邮箱格式，先查profiles表获取邮箱
+  if (!account.includes('@')) {
+    const { data, error } = await supabaseClient
+      .from('profiles').select('email')
+      .or(`id_number.eq.${account},username.eq.${account}`).maybeSingle();
+    if (error || !data?.email) throw new Error('用户不存在或未设置邮箱');
+    email = data.email;
+  }
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;
 }
 
-// 注册
-async function doRegister(email, password) {
-  const { error } = await supabaseClient.auth.signUp({ email, password });
+// ===== 注册完善资料 =====
+async function completeRegistration(nickname, idNumber, password) {
+  if (!state.user) throw new Error('未登录');
+  // 检查ID唯一性
+  const { data: existing } = await supabaseClient.from('profiles').select('id').eq('id_number', idNumber).maybeSingle();
+  if (existing) throw new Error('该ID已被使用');
+  // 更新profile
+  const { error: profileErr } = await supabaseClient.from('profiles').update({
+    display_name: nickname,
+    username: nickname,
+    id_number: idNumber,
+    id_number_changed_at: new Date().toISOString(),
+  }).eq('id', state.user.id);
+  if (profileErr) throw profileErr;
+  // 更新密码
+  const { error: pwdErr } = await supabaseClient.auth.updateUser({ password });
+  if (pwdErr) throw pwdErr;
+  await loadProfile();
+}
+
+// ===== 用户资料管理 =====
+async function updateNickname(nickname) {
+  const { error } = await supabaseClient.from('profiles').update({ display_name: nickname, username: nickname }).eq('id', state.user.id);
+  if (error) throw error;
+  await loadProfile();
+}
+
+async function updateIdNumber(newId) {
+  if (!currentProfile) throw new Error('未加载资料');
+  if (currentProfile.id_number_changed_at) {
+    const lastChange = new Date(currentProfile.id_number_changed_at);
+    const daysSince = (Date.now() - lastChange.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince < 30) throw new Error(`ID一个月只能改一次，还需${Math.ceil(30 - daysSince)}天`);
+  }
+  const { data: existing } = await supabaseClient.from('profiles').select('id').eq('id_number', newId).maybeSingle();
+  if (existing) throw new Error('该ID已被使用');
+  const { error } = await supabaseClient.from('profiles').update({ id_number: newId, id_number_changed_at: new Date().toISOString() }).eq('id', state.user.id);
+  if (error) throw error;
+  await loadProfile();
+}
+
+async function updatePassword(newPassword) {
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
   if (error) throw error;
 }
 
-// 登出
+// ===== 登出 =====
 async function doLogout() {
   await supabaseClient.auth.signOut();
   state.user = null;
+  currentProfile = null;
   updateAuthUI();
   showToast('已退出登录');
 }
 
-// 上传单条成绩到云端
+// ===== 管理员申请 =====
+async function applyAdmin(code) {
+  const { data: setting } = await supabaseClient.from('site_settings').select('value').eq('key', 'admin_invite_code').single();
+  if (!setting || setting.value !== code) throw new Error('申请码错误');
+  // 检查是否已有owner，没有则第一个申请者自动成为owner
+  const { count } = await supabaseClient.from('profiles').select('id', { count: 'exact' }).eq('role', 'owner');
+  const role = count === 0 ? 'owner' : 'admin';
+  const { error } = await supabaseClient.from('profiles').update({ role }).eq('id', state.user.id);
+  if (error) throw error;
+  await loadProfile();
+  return role;
+}
+
+// ===== 管理员：成员管理 =====
+async function listMembers() {
+  const { data, error } = await supabaseClient.from('profiles').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function setMemberRole(userId, role) {
+  const { error } = await supabaseClient.from('profiles').update({ role }).eq('id', userId);
+  if (error) throw error;
+}
+
+// ===== 所有者：管理员管理 =====
+async function listAdmins() {
+  const { data, error } = await supabaseClient.from('profiles').select('*').in('role', ['owner', 'admin']).order('role');
+  if (error) throw error;
+  return data;
+}
+
+async function addAdminByIdentifier(identifier) {
+  let query = supabaseClient.from('profiles').select('*');
+  if (identifier.includes('@')) {
+    // 邮箱需要通过auth查id，这里先用id_number/username匹配
+    const { data } = await supabaseClient.from('profiles').select('id').or(`id_number.eq.${identifier},username.eq.${identifier}`).maybeSingle();
+    if (!data) throw new Error('用户不存在');
+    const { error } = await supabaseClient.from('profiles').update({ role: 'admin' }).eq('id', data.id);
+    if (error) throw error;
+  } else {
+    const { data } = await supabaseClient.from('profiles').select('id').or(`id_number.eq.${identifier},username.eq.${identifier}`).maybeSingle();
+    if (!data) throw new Error('用户不存在');
+    const { error } = await supabaseClient.from('profiles').update({ role: 'admin' }).eq('id', data.id);
+    if (error) throw error;
+  }
+}
+
+async function removeAdmin(userId) {
+  const { error } = await supabaseClient.from('profiles').update({ role: 'member' }).eq('id', userId);
+  if (error) throw error;
+}
+
+async function updateInviteCode(newCode) {
+  const { error } = await supabaseClient.from('site_settings').update({ value: newCode }).eq('key', 'admin_invite_code');
+  if (error) throw error;
+}
+
+// ===== 管理员：数据表查看 =====
+async function loadTableData(tableName) {
+  const { data, error } = await supabaseClient.from(tableName).select('*').limit(100).order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+// ===== 云同步 =====
 async function uploadSolve(solve, project) {
   if (!state.user || !supabaseClient) return;
   try {
     await supabaseClient.from('solves').insert({
-      user_id: state.user.id,
-      project: project,
-      time_ms: solve.time,
-      penalty: solve.penalty || 'ok',
-      scramble: solve.scramble || null,
-      created_at: solve.date,
+      user_id: state.user.id, project, time_ms: solve.time,
+      penalty: solve.penalty || 'ok', scramble: solve.scramble || null, created_at: solve.date,
     });
   } catch(e) { console.warn('上传成绩失败', e); }
 }
 
-// 把本地所有成绩推到云端（去重）
 async function pushToCloud() {
   if (!state.user || !supabaseClient) return;
-  state.syncing = true;
-  updateSyncStats();
   try {
-    // 先拉取云端已有ID去重
     const { data: existing } = await supabaseClient.from('solves').select('created_at, time_ms, project');
     const existingSet = new Set(existing?.map(e => `${e.project}|${e.time_ms}|${e.created_at}`));
     const toInsert = [];
@@ -1046,69 +1340,138 @@ async function pushToCloud() {
       for (const s of state.solves[project]) {
         const key = `${project}|${s.time}|${s.date}`;
         if (!existingSet.has(key)) {
-          toInsert.push({
-            user_id: state.user.id,
-            project,
-            time_ms: s.time,
-            penalty: s.penalty || 'ok',
-            scramble: s.scramble || null,
-            created_at: s.date,
-          });
+          toInsert.push({ user_id: state.user.id, project, time_ms: s.time, penalty: s.penalty || 'ok', scramble: s.scramble || null, created_at: s.date });
         }
       }
     }
-    if (toInsert.length > 0) {
-      await supabaseClient.from('solves').insert(toInsert);
-    }
+    if (toInsert.length > 0) await supabaseClient.from('solves').insert(toInsert);
     showToast(`已同步 ${toInsert.length} 条成绩到云端`);
-  } catch(e) {
-    console.warn('同步失败', e);
-    showToast('同步失败：' + e.message);
-  }
-  state.syncing = false;
-  updateSyncStats();
+  } catch(e) { showToast('同步失败：' + e.message); }
 }
 
-// 从云端拉取成绩并合并到本地
 async function pullFromCloud() {
   if (!state.user || !supabaseClient) return;
-  state.syncing = true;
-  updateSyncStats();
   try {
     const { data, error } = await supabaseClient.from('solves').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    if (!data || data.length === 0) { state.syncing = false; updateSyncStats(); return; }
+    if (error || !data || data.length === 0) return;
     let added = 0;
     for (const row of data) {
-      const project = row.project;
-      if (!state.solves[project]) state.solves[project] = [];
-      // 用 time+date 去重
-      const exists = state.solves[project].some(s => s.time === row.time_ms && s.date === row.created_at);
+      if (!state.solves[row.project]) state.solves[row.project] = [];
+      const exists = state.solves[row.project].some(s => s.time === row.time_ms && s.date === row.created_at);
       if (!exists) {
-        state.solves[project].push({
-          id: row.id,
-          time: row.time_ms,
-          penalty: row.penalty === 'ok' ? null : row.penalty,
-          scramble: row.scramble,
-          date: row.created_at,
-        });
+        state.solves[row.project].push({ id: row.id, time: row.time_ms, penalty: row.penalty === 'ok' ? null : row.penalty, scramble: row.scramble, date: row.created_at });
         added++;
       }
     }
-    // 按日期排序
-    for (const p in state.solves) {
-      state.solves[p].sort((a, b) => new Date(b.date) - new Date(a.date));
-    }
-    saveData();
-    renderSolves();
-    renderStats();
+    for (const p in state.solves) state.solves[p].sort((a, b) => new Date(b.date) - new Date(a.date));
+    saveData(); renderSolves(); renderStats();
     if (added > 0) showToast(`从云端恢复 ${added} 条成绩`);
-  } catch(e) {
-    console.warn('拉取云端数据失败', e);
-  }
-  state.syncing = false;
-  updateSyncStats();
+  } catch(e) { console.warn('拉取云端数据失败', e); }
 }
+
+// ===== 用户主页渲染 =====
+function renderProfile() {
+  if (!currentProfile) return;
+  const p = currentProfile;
+  document.getElementById('profileAvatar').textContent = (p.display_name || p.username || 'U')[0].toUpperCase();
+  document.getElementById('profileName').textContent = p.display_name || '未设置';
+  document.getElementById('profileId').textContent = p.id_number ? 'ID: ' + p.id_number : 'ID: 未设置';
+  const roleEl = document.getElementById('profileRole');
+  roleEl.textContent = p.role === 'owner' ? '网站所有者' : p.role === 'admin' ? '管理员' : '普通成员';
+  roleEl.className = 'profile-role ' + p.role;
+  document.getElementById('profileEmail').textContent = state.user.email;
+  document.getElementById('editNickname').value = p.display_name || '';
+  document.getElementById('editIdNumber').value = p.id_number || '';
+  // ID修改提示
+  const hint = document.getElementById('idChangeHint');
+  if (p.id_number_changed_at) {
+    const days = (Date.now() - new Date(p.id_number_changed_at).getTime()) / 86400000;
+    hint.textContent = days < 30 ? `ID一个月只能改一次，还需${Math.ceil(30 - days)}天` : 'ID可以修改';
+  } else {
+    hint.textContent = 'ID可以修改';
+  }
+  // 管理员/所有者入口
+  document.getElementById('btnOpenAdmin').style.display = (p.role === 'admin' || p.role === 'owner') ? '' : 'none';
+  document.getElementById('btnOpenOwner').style.display = p.role === 'owner' ? '' : 'none';
+  // 管理员申请入口（普通成员可见）
+  document.getElementById('adminApplySection').style.display = p.role === 'member' ? '' : 'none';
+}
+
+// ===== 管理员：成员列表渲染 =====
+async function renderAdminMembers() {
+  const list = document.getElementById('adminMemberList');
+  list.innerHTML = '加载中...';
+  try {
+    const members = await listMembers();
+    list.innerHTML = members.map(m => `
+      <div class="admin-member-item">
+        <div class="admin-member-info">
+          <div class="admin-member-avatar">${(m.display_name || m.username || 'U')[0].toUpperCase()}</div>
+          <div>
+            <div class="admin-member-name">${m.display_name || '未设置'} <span class="role-badge ${m.role}">${m.role === 'owner' ? '所有者' : m.role === 'admin' ? '管理员' : '成员'}</span></div>
+            <div class="admin-member-meta">ID: ${m.id_number || '未设置'} · ${m.id.slice(0,8)}...</div>
+          </div>
+        </div>
+        <div class="admin-member-actions">
+          ${m.role !== 'owner' ? `
+            <button class="btn" onclick="window._setRole('${m.id}', '${m.role === 'admin' ? 'member' : 'admin'}')">${m.role === 'admin' ? '取消管理员' : '设为管理员'}</button>
+          ` : '<span style="font-size:12px;color:var(--text-faint)">所有者</span>'}
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { list.innerHTML = '加载失败：' + e.message; }
+}
+
+window._setRole = async function(userId, role) {
+  try { await setMemberRole(userId, role); showToast('已更新角色'); renderAdminMembers(); }
+  catch(e) { showToast('操作失败：' + e.message); }
+};
+
+// ===== 管理员：数据表渲染 =====
+async function renderAdminTable() {
+  const table = document.getElementById('adminDataTable');
+  const tableName = document.getElementById('adminTableSelect').value;
+  table.innerHTML = '加载中...';
+  try {
+    const data = await loadTableData(tableName);
+    if (!data || data.length === 0) { table.innerHTML = '无数据'; return; }
+    const keys = Object.keys(data[0]);
+    table.innerHTML = `<table><thead><tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr></thead><tbody>${
+      data.map(row => `<tr>${keys.map(k => `<td title="${String(row[k] ?? '')}">${String(row[k] ?? '').slice(0, 40)}</td>`).join('')}</tr>`).join('')
+    }</tbody></table>`;
+  } catch(e) { table.innerHTML = '加载失败：' + e.message; }
+}
+
+// ===== 所有者：管理员列表渲染 =====
+async function renderOwnerAdmins() {
+  const list = document.getElementById('ownerAdminList');
+  list.innerHTML = '加载中...';
+  try {
+    const admins = await listAdmins();
+    list.innerHTML = admins.map(m => `
+      <div class="admin-member-item">
+        <div class="admin-member-info">
+          <div class="admin-member-avatar">${(m.display_name || 'U')[0].toUpperCase()}</div>
+          <div>
+            <div class="admin-member-name">${m.display_name || '未设置'} <span class="role-badge ${m.role}">${m.role === 'owner' ? '所有者' : '管理员'}</span></div>
+            <div class="admin-member-meta">ID: ${m.id_number || '未设置'}</div>
+          </div>
+        </div>
+        <div class="admin-member-actions">
+          ${m.role !== 'owner' ? `<button class="btn danger" onclick="window._removeAdmin('${m.id}')">移除管理员</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+    // 加载当前申请码
+    const { data } = await supabaseClient.from('site_settings').select('value').eq('key', 'admin_invite_code').single();
+    document.getElementById('editInviteCode').value = data?.value || '';
+  } catch(e) { list.innerHTML = '加载失败：' + e.message; }
+}
+
+window._removeAdmin = async function(userId) {
+  try { await removeAdmin(userId); showToast('已移除管理员'); renderOwnerAdmins(); }
+  catch(e) { showToast('操作失败：' + e.message); }
+};
 
 // ===== 存储 =====
 const STORAGE_KEY = 'cc-timer-data';
@@ -1841,46 +2204,178 @@ document.getElementById('btnDoneSettings').onclick = applySettings;
 document.getElementById('settingInspectionTime').onclick = function() { this.classList.toggle('on'); };
 document.getElementById('settingHideScramble').onclick = function() { this.classList.toggle('on'); };
 
-// ===== 登录/云同步事件 =====
-document.getElementById('btnAuth').onclick = () => {
-  document.getElementById('authModal').classList.add('open');
-  updateAuthUI();
+// ===== 认证事件 =====
+document.getElementById('btnAuth').onclick = async () => {
+  if (state.user) {
+    // 已登录 → 打开用户主页
+    await loadProfile();
+    renderProfile();
+    document.getElementById('profileModal').classList.add('open');
+  } else {
+    // 未登录 → 打开登录弹窗
+    document.getElementById('authLoginView').style.display = 'block';
+    document.getElementById('authRegisterView').style.display = 'none';
+    document.getElementById('authModal').classList.add('open');
+  }
 };
-document.getElementById('closeAuth').onclick = () => {
-  document.getElementById('authModal').classList.remove('open');
-};
-document.getElementById('btnLogin').onclick = async () => {
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
-  const errEl = document.getElementById('authError');
+document.getElementById('closeAuth').onclick = () => document.getElementById('authModal').classList.remove('open');
+
+// 登录方式切换
+document.querySelectorAll('.auth-tab[data-mode]').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.auth-tab[data-mode]').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const mode = tab.dataset.mode;
+    document.getElementById('otpLoginForm').style.display = mode === 'otp' ? 'block' : 'none';
+    document.getElementById('passwordLoginForm').style.display = mode === 'password' ? 'block' : 'none';
+  };
+});
+
+// 发送验证码
+let otpCooldown = 0;
+document.getElementById('btnSendOtp').onclick = async () => {
+  const email = document.getElementById('otpEmail').value.trim();
+  const errEl = document.getElementById('otpError');
   errEl.textContent = '';
-  if (!email || !password) { errEl.textContent = '请输入邮箱和密码'; return; }
+  if (!email) { errEl.textContent = '请输入邮箱'; return; }
   try {
-    await doLogin(email, password);
+    await sendOtp(email);
+    showToast('验证码已发送，请查收邮件');
+    const btn = document.getElementById('btnSendOtp');
+    let sec = 60;
+    btn.disabled = true;
+    const timer = setInterval(() => {
+      btn.textContent = `${sec}秒后重发`;
+      if (--sec < 0) { clearInterval(timer); btn.textContent = '发送验证码'; btn.disabled = false; }
+    }, 1000);
+  } catch(e) { errEl.textContent = e.message; }
+};
+
+// 验证码登录
+document.getElementById('btnOtpLogin').onclick = async () => {
+  const email = document.getElementById('otpEmail').value.trim();
+  const code = document.getElementById('otpCode').value.trim();
+  const errEl = document.getElementById('otpError');
+  errEl.textContent = '';
+  if (!email || !code) { errEl.textContent = '请输入邮箱和验证码'; return; }
+  try {
+    await verifyOtp(email, code);
+    // 检查是否新用户
+    if (isNewUser()) {
+      document.getElementById('authLoginView').style.display = 'none';
+      document.getElementById('authRegisterView').style.display = 'block';
+      document.getElementById('authModalTitle').textContent = '完善资料';
+    } else {
+      document.getElementById('authModal').classList.remove('open');
+      showToast('登录成功');
+    }
+  } catch(e) { errEl.textContent = e.message; }
+};
+
+// 密码登录
+document.getElementById('btnPasswordLogin').onclick = async () => {
+  const account = document.getElementById('loginAccount').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('passwordError');
+  errEl.textContent = '';
+  if (!account || !password) { errEl.textContent = '请输入账号和密码'; return; }
+  try {
+    await passwordLogin(account, password);
+    await loadProfile();
     document.getElementById('authModal').classList.remove('open');
     showToast('登录成功');
   } catch(e) { errEl.textContent = e.message; }
 };
-document.getElementById('btnRegister').onclick = async () => {
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
-  const errEl = document.getElementById('authError');
+
+// 完成注册
+document.getElementById('btnCompleteRegister').onclick = async () => {
+  const nickname = document.getElementById('regNickname').value.trim();
+  const idNumber = document.getElementById('regIdNumber').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const errEl = document.getElementById('regError');
   errEl.textContent = '';
-  if (!email || !password) { errEl.textContent = '请输入邮箱和密码'; return; }
+  if (!nickname || !idNumber || !password) { errEl.textContent = '请填写全部信息'; return; }
+  if (!/^[a-zA-Z0-9_]{3,20}$/.test(idNumber)) { errEl.textContent = 'ID需为3-20位字母数字下划线'; return; }
   if (password.length < 6) { errEl.textContent = '密码至少6位'; return; }
   try {
-    await doRegister(email, password);
-    errEl.style.color = 'var(--accent)';
-    errEl.textContent = '注册成功！请去邮箱验证后登录';
-    errEl.style.color = '';
+    await completeRegistration(nickname, idNumber, password);
+    document.getElementById('authModal').classList.remove('open');
+    showToast('注册完成，欢迎使用！');
   } catch(e) { errEl.textContent = e.message; }
 };
-document.getElementById('btnLogout').onclick = async () => {
+
+// ===== 用户主页事件 =====
+document.getElementById('closeProfile').onclick = () => document.getElementById('profileModal').classList.remove('open');
+document.getElementById('btnLogout2').onclick = async () => {
   await doLogout();
-  document.getElementById('authModal').classList.remove('open');
+  document.getElementById('profileModal').classList.remove('open');
 };
-document.getElementById('btnSyncNow').onclick = async () => {
-  await pushToCloud();
+document.getElementById('btnSaveNickname').onclick = async () => {
+  const name = document.getElementById('editNickname').value.trim();
+  if (!name) return;
+  try { await updateNickname(name); renderProfile(); showToast('昵称已更新'); }
+  catch(e) { showToast('失败：' + e.message); }
+};
+document.getElementById('btnSaveIdNumber').onclick = async () => {
+  const id = document.getElementById('editIdNumber').value.trim();
+  if (!/^[a-zA-Z0-9_]{3,20}$/.test(id)) { showToast('ID需为3-20位字母数字下划线'); return; }
+  try { await updateIdNumber(id); renderProfile(); showToast('ID已更新'); }
+  catch(e) { showToast('失败：' + e.message); }
+};
+document.getElementById('btnSavePassword').onclick = async () => {
+  const pwd = document.getElementById('editPassword').value;
+  if (pwd.length < 6) { showToast('密码至少6位'); return; }
+  try { await updatePassword(pwd); document.getElementById('editPassword').value = ''; showToast('密码已修改'); }
+  catch(e) { showToast('失败：' + e.message); }
+};
+
+// 管理员申请
+document.getElementById('btnApplyAdmin').onclick = async () => {
+  const code = document.getElementById('applyCode').value.trim();
+  if (!code) return;
+  try {
+    const role = await applyAdmin(code);
+    showToast(role === 'owner' ? '恭喜！你已成为网站所有者' : '管理员申请成功');
+    renderProfile();
+  } catch(e) { showToast('失败：' + e.message); }
+};
+
+// ===== 管理员面板事件 =====
+document.getElementById('btnOpenAdmin').onclick = () => {
+  document.getElementById('profileModal').classList.remove('open');
+  renderAdminMembers();
+  document.getElementById('adminModal').classList.add('open');
+};
+document.getElementById('closeAdmin').onclick = () => document.getElementById('adminModal').classList.remove('open');
+document.querySelectorAll('.admin-tabs .auth-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.admin-tabs .auth-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const t = tab.dataset.adminTab;
+    document.getElementById('adminMembersView').style.display = t === 'members' ? 'block' : 'none';
+    document.getElementById('adminDataView').style.display = t === 'data' ? 'block' : 'none';
+  };
+});
+document.getElementById('btnLoadTable').onclick = renderAdminTable;
+
+// ===== 所有者面板事件 =====
+document.getElementById('btnOpenOwner').onclick = () => {
+  document.getElementById('profileModal').classList.remove('open');
+  renderOwnerAdmins();
+  document.getElementById('ownerModal').classList.add('open');
+};
+document.getElementById('closeOwner').onclick = () => document.getElementById('ownerModal').classList.remove('open');
+document.getElementById('btnAddAdmin').onclick = async () => {
+  const id = document.getElementById('addAdminInput').value.trim();
+  if (!id) return;
+  try { await addAdminByIdentifier(id); showToast('已添加管理员'); renderOwnerAdmins(); document.getElementById('addAdminInput').value = ''; }
+  catch(e) { showToast('失败：' + e.message); }
+};
+document.getElementById('btnSaveInviteCode').onclick = async () => {
+  const code = document.getElementById('editInviteCode').value.trim();
+  if (!code) return;
+  try { await updateInviteCode(code); showToast('申请码已更新'); }
+  catch(e) { showToast('失败：' + e.message); }
 };
 
 document.getElementById('closeDetail').onclick = () => {
