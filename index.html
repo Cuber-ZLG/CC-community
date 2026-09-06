@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC Timer</title>
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap">
+<style>
+/* ===== 设计 Token ===== */
+:root {
+  --bg: #0d0f13;
+  --bg-elev: #15181e;
+  --bg-elev-2: #1c2028;
+  --border: #272c36;
+  --border-light: #323844;
+  --text: #e6e8ec;
+  --text-dim: #8a8f9c;
+  --text-faint: #565b66;
+  --accent: #4ade80;
+  --accent-dim: rgba(74, 222, 128, 0.12);
+  --danger: #f87171;
+  --danger-dim: rgba(248, 113, 113, 0.12);
+  --warn: #fbbf24;
+  --warn-dim: rgba(251, 191, 36, 0.12);
+  --info: #60a5fa;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+/* ===== 浅色主题 ===== */
+[data-theme="light"] {
+  --bg: #f5f6f8;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f0f1f4;
+  --border: #e2e4e9;
+  --border-light: #d1d4db;
+  --text: #1a1d23;
+  --text-dim: #5a6070;
+  --text-faint: #9aa0ac;
+  --accent: #16a34a;
+  --accent-dim: rgba(22, 163, 74, 0.1);
+  --danger: #dc2626;
+  --danger-dim: rgba(220, 38, 38, 0.1);
+  --warn: #d97706;
+  --warn-dim: rgba(217, 119, 6, 0.1);
+  --info: #2563eb;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* ===== 顶部栏 ===== */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+  flex-shrink: 0;
+}
+
+.brand {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.brand-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.project-tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.project-tabs::-webkit-scrollbar { display: none; }
+
+.project-tab {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+.project-tab:hover { color: var(--text); background: var(--bg-elev-2); }
+.project-tab.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: rgba(74, 222, 128, 0.25);
+}
+
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--bg-elev-2);
+  border-color: var(--border);
+}
+.icon-btn svg { width: 17px; height: 17px; }
+
+/* ===== 主体布局：左计时区 + 右成绩列 ===== */
+.main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  min-height: 0;
+}
+
+/* ===== 计时区（左侧区域垂直居中） ===== */
+.timer-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  min-width: 0;
+  position: relative;
+  gap: 0;
+  transition: background-color 0.15s;
+}
+.timer-area.state-observing { background: rgba(202, 138, 4, 0.15); }
+.timer-area.state-ready { background: rgba(22, 163, 74, 0.15); }
+.timer-area.state-running { background: rgba(220, 38, 38, 0.12); }
+
+/* 打乱公式：计时器正上方，适当间距 */
+.scramble-box {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  width: min(760px, 92%);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  margin-bottom: 28px;
+}
+.scramble-box:hover { border-color: var(--border-light); }
+
+.scramble-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scramble-text {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+  letter-spacing: 0.5px;
+}
+
+/* ===== 计时器显示 ===== */
+.timer-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-height: 0;
+}
+
+.timer-time {
+  font-family: var(--font-mono);
+  font-size: clamp(80px, 16vw, 190px);
+  font-weight: 300;
+  letter-spacing: -2px;
+  color: var(--text);
+  line-height: 1.1;
+  transition: color 0.1s;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-time.ready { color: var(--accent); }
+.timer-time.ticking { color: var(--danger); }
+.timer-time.inspecting { color: var(--info); font-size: clamp(56px, 10vw, 120px); }
+
+.timer-status {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-faint);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  height: 18px;
+}
+
+/* ===== 统计行：计时器下方 ===== */
+.stats-row {
+  display: flex;
+  gap: 1px;
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  width: min(600px, 88%);
+  margin-top: 28px;
+}
+
+.stat-cell {
+  background: var(--bg-elev);
+  padding: 10px 8px;
+  flex: 1;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  margin-bottom: 3px;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value.best { color: var(--accent); }
+.stat-value.dnf { color: var(--danger); }
+
+/* ===== 右侧成绩列表 ===== */
+.sidebar {
+  border-left: 1px solid var(--border);
+  background: var(--bg-elev);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.solves-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.solves-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
+.solves-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.solves-list {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+.solves-list::-webkit-scrollbar { width: 5px; }
+.solves-list::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+
+.solve-item {
+  display: flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(39, 44, 54, 0.5);
+  cursor: pointer;
+  transition: background 0.1s;
+  gap: 8px;
+}
+.solve-item:hover { background: var(--bg-elev-2); }
+.solve-item.selected { background: var(--accent-dim); }
+
+.solve-index {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.solve-time {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+}
+.solve-time.plus2 { color: var(--warn); }
+.solve-time.dnf { color: var(--danger); }
+
+.solve-date {
+  font-size: 10px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.solve-delete {
+  opacity: 0;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px;
+  color: var(--text-faint);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.solve-item:hover .solve-delete { opacity: 1; }
+.solve-delete:hover { color: var(--danger); background: var(--danger-dim); }
+.solve-delete svg { width: 13px; height: 13px; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  color: var(--text-faint);
+  text-align: center;
+  gap: 6px;
+}
+.empty-state svg { width: 28px; height: 28px; opacity: 0.4; }
+.empty-state p { font-size: 12px; }
+
+/* ===== 设置弹窗 ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 440px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-title { font-size: 14px; font-weight: 600; }
+
+.modal-body { padding: 18px; }
+
+.setting-group { margin-bottom: 20px; }
+.setting-group:last-child { margin-bottom: 0; }
+
+.setting-group-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(39, 44, 54, 0.5);
+}
+.setting-row:last-child { border-bottom: none; }
+
+.setting-label { font-size: 13px; color: var(--text); }
+.setting-desc { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+.toggle {
+  position: relative;
+  width: 38px; height: 21px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: all 0.2s;
+}
+.toggle.on {
+  background: var(--accent-dim);
+  border-color: rgba(74, 222, 128, 0.4);
+}
+.toggle.on::after { left: 19px; background: var(--accent); }
+
+.select {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12.5px;
+  padding: 5px 9px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  outline: none;
+}
+.select:focus { border-color: var(--accent); }
+
+.btn {
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+.btn:hover { border-color: var(--border-light); background: var(--border); }
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0d0f13;
+}
+.btn.primary:hover { background: #22c55e; border-color: #22c55e; }
+.btn.danger {
+  color: var(--danger);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+.btn.danger:hover { background: var(--danger-dim); }
+
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  justify-content: flex-end;
+}
+
+/* ===== 成绩详情弹窗 ===== */
+.detail-scramble {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin-top: 8px;
+  word-break: break-word;
+}
+
+.detail-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ===== 手动输入弹窗 ===== */
+.manual-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.manual-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 8px 12px;
+  outline: none;
+  text-align: center;
+}
+.manual-input:focus { border-color: var(--accent); }
+
+.manual-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 6px;
+}
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-light);
+  color: var(--text);
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  opacity: 0;
+  transition: all 0.25s;
+  z-index: 200;
+  pointer-events: none;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 900px) {
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .sidebar {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    max-height: 35vh;
+  }
+  .timer-area { padding-top: 16px; }
+  .scramble-text { font-size: 14px; }
+}
+
+@media (max-width: 600px) {
+  .topbar { padding: 6px 8px; gap: 4px; }
+  .brand { font-size: 13px; }
+  .project-tabs { margin-left: 6px; }
+  .project-tab { padding: 3px 7px; font-size: 11px; }
+  .stat-value { font-size: 15px; }
+  .stat-label { font-size: 9px; }
+  .scramble-box { padding: 10px 14px; }
+  .scramble-text { font-size: 13px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ===== 顶部栏 ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      CC Timer
+    </div>
+    <nav class="project-tabs" id="projectTabs"></nav>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btnSettings" title="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== 主区域 ===== -->
+  <div class="main">
+    <!-- 计时区 -->
+    <section class="timer-area" id="timerArea">
+      <div class="scramble-box" id="scrambleBox" title="点击生成新打乱">
+        <div class="scramble-label">
+          <span>Scramble</span>
+          <span id="scrambleLen"></span>
+        </div>
+        <div class="scramble-text" id="scrambleText">点击生成打乱</div>
+      </div>
+
+      <div class="timer-display">
+        <div class="timer-time" id="timerTime">0.00</div>
+        <div class="timer-status" id="timerStatus">按住空格开始</div>
+      </div>
+
+      <!-- 统计行 -->
+      <div class="stats-row">
+        <div class="stat-cell">
+          <div class="stat-label">Ao5</div>
+          <div class="stat-value" id="statAo5">—</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Ao12</div>
+          <div class="stat-value" id="statAo12">—</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Best</div>
+          <div class="stat-value best" id="statBest">—</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Mean</div>
+          <div class="stat-value" id="statMean">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右侧成绩列表 -->
+    <aside class="sidebar">
+      <div class="solves-header">
+        <span class="solves-title">成绩记录</span>
+        <span class="solves-count" id="solvesCount">0 次</span>
+      </div>
+      <div class="solves-list" id="solvesList">
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <p>还没有成绩</p>
+          <p style="font-size:10px">按住空格，变绿后松开开始计时</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ===== 设置弹窗 ===== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">设置</span>
+      <button class="icon-btn" id="closeSettings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="setting-group">
+        <div class="setting-group-title">计时</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">15秒观察时间</div>
+            <div class="setting-desc">新打乱后自动开始观察倒计时</div>
+          </div>
+          <div class="toggle on" id="settingInspectionTime"></div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">长按触发时间</div>
+            <div class="setting-desc">按住空格多久后触发状态</div>
+          </div>
+          <select class="select" id="settingHoldTime">
+            <option value="0">关闭</option>
+            <option value="0.3" selected>0.3 秒</option>
+            <option value="0.5">0.5 秒</option>
+            <option value="1">1 秒</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">成绩计入方式</div>
+            <div class="setting-desc">停止后自动记录 or 手动输入</div>
+          </div>
+          <select class="select" id="settingEntryMode">
+            <option value="auto">自动计入</option>
+            <option value="manual">手动输入</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">小数位数</div>
+            <div class="setting-desc">计时显示精度</div>
+          </div>
+          <select class="select" id="settingDecimals">
+            <option value="2" selected>2 位（百分秒）</option>
+            <option value="3">3 位（千分秒）</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">输入时隐藏打乱</div>
+            <div class="setting-desc">计时开始后隐藏打乱公式</div>
+          </div>
+          <div class="toggle" id="settingHideScramble"></div>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">主题</div>
+            <div class="setting-desc">界面外观</div>
+          </div>
+          <select class="select" id="settingTheme">
+            <option value="dark" selected>深色</option>
+            <option value="light">浅色</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="setting-group-title">数据</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">导出所有数据</div>
+            <div class="setting-desc">下载 JSON 备份文件</div>
+          </div>
+          <button class="btn" id="btnExport">导出</button>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">导入数据</div>
+            <div class="setting-desc">从 JSON 文件恢复</div>
+          </div>
+          <button class="btn" id="btnImport">导入</button>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">清除当前项目成绩</div>
+            <div class="setting-desc">不可恢复</div>
+          </div>
+          <button class="btn danger" id="btnClearProject">清除</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" id="btnDoneSettings">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 成绩详情弹窗 ===== -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">成绩详情</span>
+      <button class="icon-btn" id="closeDetail">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer">
+      <button class="btn danger" id="btnDeleteSolve">删除此成绩</button>
+      <button class="btn primary" id="btnDoneDetail">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 手动输入弹窗 ===== -->
+<div class="modal-overlay" id="manualModal">
+  <div class="modal" style="width:360px">
+    <div class="modal-header">
+      <span class="modal-title">手动输入成绩</span>
+      <button class="icon-btn" id="closeManual">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="setting-label">输入成绩（秒）</div>
+      <div class="manual-input-row">
+        <input type="text" class="manual-input" id="manualTimeInput" placeholder="12.34" autocomplete="off">
+      </div>
+      <div class="manual-hint">支持格式：12.34 / 1:23.45 / DNF</div>
+      <div class="detail-actions">
+        <button class="btn" data-penalty="plus2">+2</button>
+        <button class="btn danger" data-penalty="dnf">DNF</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" id="btnConfirmManual">确认记录</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// CC Timer v3 — 魔方计时器
+// ============================================================
+
+// ===== 项目定义 =====
+const PROJECTS = [
+  { id: '222',   name: '2x2',   faces: ['U','R','F'], modifiers: ['', "'", '2'], len: 11, wide: false },
+  { id: '333',   name: '3x3',   faces: ['U','D','L','R','F','B'], modifiers: ['', "'", '2'], len: 20, wide: false },
+  { id: '444',   name: '4x4',   faces: ['U','D','L','R','F','B'], modifiers: ['', "'", '2'], len: 40, wide: true, wideFaces: ['Uw','Dw','Lw','Rw','Fw','Bw'] },
+  { id: '555',   name: '5x5',   faces: ['U','D','L','R','F','B'], modifiers: ['', "'", '2'], len: 60, wide: true, wideFaces: ['Uw','Dw','Lw','Rw','Fw','Bw'] },
+  { id: '666',   name: '6x6',   faces: ['U','D','L','R','F','B'], modifiers: ['', "'", '2'], len: 80, wide: true, wideFaces: ['Uw','Dw','Lw','Rw','Fw','Bw','3Uw','3Dw','3Lw','3Rw','3Fw','3Bw'] },
+  { id: '777',   name: '7x7',   faces: ['U','D','L','R','F','B'], modifiers: ['', "'", '2'], len: 100, wide: true, wideFaces: ['Uw','Dw','Lw','Rw','Fw','Bw','3Uw','3Dw','3Lw','3Rw','3Fw','3Bw'] },
+  { id: 'pyram', name: '金字塔', faces: ['u','l','r','b'], modifiers: ['', "'"], len: 11, wide: false },
+  { id: 'skewb', name: '斜转',   faces: ['U','R','L','D','B','F'], modifiers: ['', "'"], len: 10, wide: false },
+  { id: 'sq1',   name: 'SQ1',   faces: [], modifiers: [], len: 12, wide: false, special: 'sq1' },
+  { id: 'mega',  name: '五魔方', faces: ['R','D','U','L','F','B'], modifiers: ['++','--'], len: 30, wide: false },
+];
+
+const OPPOSITE = { U:'D', D:'U', L:'R', R:'L', F:'B', B:'F', Uw:'Dw', Dw:'Uw', Lw:'Rw', Rw:'Lw', Fw:'Bw', Bw:'Fw', '3Uw':'3Dw','3Dw':'3Uw','3Lw':'3Rw','3Rw':'3Lw','3Fw':'3Bw','3Bw':'3Fw', u:'d', d:'u', l:'r', r:'l' };
+
+// ===== 状态 =====
+const state = {
+  currentProject: '333',
+  solves: {},
+  settings: {
+    inspectionTime: true,   // 15秒观察时间
+    holdTime: 0.3,          // 长按触发时间（秒）
+    entryMode: 'auto',      // auto / manual
+    decimals: 2,
+    hideScramble: false,
+    theme: 'dark',
+  },
+  timer: {
+    phase: 'idle', // idle | holding | observing | ready | running | stopped
+    startTime: 0,
+    elapsed: 0,
+    rafId: null,
+    holdTimer: null,
+    inspectTimer: null,
+    inspectRemaining: 15,
+    prevPhase: 'idle', // 长按取消时恢复的状态
+  },
+  currentScramble: '',
+  selectedSolveId: null,
+  manualPenalty: null,
+};
+
+// ===== 存储 =====
+const STORAGE_KEY = 'cc-timer-data';
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      state.solves = data.solves || {};
+      state.currentProject = data.currentProject || '333';
+      if (data.settings) Object.assign(state.settings, data.settings);
+    }
+  } catch(e) { console.warn('加载数据失败', e); }
+  if (!state.solves[state.currentProject]) state.solves[state.currentProject] = [];
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      solves: state.solves,
+      currentProject: state.currentProject,
+      settings: state.settings,
+    }));
+  } catch(e) { console.warn('保存失败', e); }
+}
+
+// ===== 打乱生成器 =====
+function generateScramble(projectId) {
+  const proj = PROJECTS.find(p => p.id === projectId);
+  if (!proj) return '';
+  if (proj.special === 'sq1') return generateSQ1();
+
+  const allFaces = proj.wide ? [...proj.faces, ...proj.wideFaces] : proj.faces;
+  const moves = [];
+  let lastFace = null, lastLastFace = null;
+
+  while (moves.length < proj.len) {
+    const face = allFaces[Math.floor(Math.random() * allFaces.length)];
+    if (face === lastFace) continue;
+    if (lastLastFace && face === lastLastFace && OPPOSITE[face] === lastFace) continue;
+    if (lastFace && (face.replace(/w/g,'').replace(/^3/,'') === lastFace.replace(/w/g,'').replace(/^3/,''))) continue;
+
+    const mod = proj.modifiers[Math.floor(Math.random() * proj.modifiers.length)];
+    moves.push(face + mod);
+    lastLastFace = lastFace;
+    lastFace = face;
+  }
+  return moves.join(' ');
+}
+
+function generateSQ1() {
+  const moves = [];
+  for (let i = 0; i < 12; i++) {
+    if (i > 0) moves.push('/');
+    let x, y;
+    do {
+      x = Math.floor(Math.random() * 12) - 5;
+      y = Math.floor(Math.random() * 12) - 5;
+    } while (x === 0 && y === 0);
+    moves.push(`(${x},${y})`);
+  }
+  moves.push('/');
+  return moves.join(' ');
+}
+
+// ===== 计时器 =====
+const timerTime = document.getElementById('timerTime');
+const timerStatus = document.getElementById('timerStatus');
+const scrambleBox = document.getElementById('scrambleBox');
+const scrambleText = document.getElementById('scrambleText');
+
+function formatTime(ms, decimals) {
+  if (ms === Infinity || ms === null) return 'DNF';
+  decimals = decimals || state.settings.decimals;
+  const totalSec = ms / 1000;
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec - minutes * 60;
+  if (minutes > 0) {
+    return minutes + ':' + seconds.toFixed(decimals).padStart(decimals + 3, '0');
+  }
+  return seconds.toFixed(decimals);
+}
+
+function updateTimerDisplay() {
+  const t = state.timer;
+  if (t.phase === 'running') {
+    t.elapsed = performance.now() - t.startTime;
+  }
+  if (t.phase === 'observing') {
+    timerTime.textContent = t.inspectRemaining.toFixed(1);
+    return;
+  }
+  timerTime.textContent = formatTime(t.elapsed);
+}
+
+function startRaf() {
+  function loop() {
+    updateTimerDisplay();
+    state.timer.rafId = requestAnimationFrame(loop);
+  }
+  state.timer.rafId = requestAnimationFrame(loop);
+}
+
+function stopRaf() {
+  if (state.timer.rafId) {
+    cancelAnimationFrame(state.timer.rafId);
+    state.timer.rafId = null;
+  }
+}
+
+// ===== 15秒观察时间 =====
+// ===== 状态切换（统一更新背景色） =====
+function setPhase(phase) {
+  const t = state.timer;
+  t.phase = phase;
+  const area = document.getElementById('timerArea');
+  area.classList.remove('state-observing', 'state-ready', 'state-running');
+  if (phase === 'observing') area.classList.add('state-observing');
+  if (phase === 'ready') area.classList.add('state-ready');
+  if (phase === 'running') area.classList.add('state-running');
+}
+
+// ===== 15秒观察时间 =====
+function startInspection() {
+  const t = state.timer;
+  if (!state.settings.inspectionTime) {
+    setPhase('idle');
+    timerTime.classList.remove('inspecting');
+    timerStatus.textContent = '按住空格开始';
+    return;
+  }
+  setPhase('observing');
+  t.inspectRemaining = 15;
+  timerTime.classList.add('inspecting');
+  timerTime.classList.remove('ready', 'ticking');
+  timerStatus.textContent = '观察中 — 再次长按进入就绪';
+  updateTimerDisplay();
+
+  const start = performance.now();
+  t.inspectTimer = setInterval(() => {
+    const elapsed = (performance.now() - start) / 1000;
+    t.inspectRemaining = Math.max(0, 15 - elapsed);
+    updateTimerDisplay();
+    if (t.inspectRemaining <= 0) {
+      clearInterval(t.inspectTimer);
+      t.inspectTimer = null;
+      // 超时未开始计时 → DNF
+      if (t.phase === 'observing') {
+        handleInspectionDNF();
+      }
+    }
+  }, 50);
+}
+
+function handleInspectionDNF() {
+  addSolve(0, 'dnf');
+  newScramble();
+  setPhase('idle');
+  timerTime.classList.remove('inspecting');
+  timerTime.textContent = formatTime(0);
+  timerStatus.textContent = '观察超时 DNF — 按住空格开始';
+  showToast('观察超时，记为 DNF');
+}
+
+// ===== 长按检测（0.3秒触发） =====
+function enterHolding() {
+  const t = state.timer;
+  if (t.phase === 'running') return;
+  t.prevPhase = t.phase; // 记录取消时恢复的状态
+  setPhase('holding');
+  timerTime.classList.remove('ready', 'ticking', 'inspecting');
+  timerStatus.textContent = '保持按住...';
+
+  const holdMs = state.settings.holdTime * 1000;
+  if (holdMs > 0) {
+    t.holdTimer = setTimeout(() => {
+      if (t.phase === 'holding') {
+        onHoldComplete();
+      }
+    }, holdMs);
+  } else {
+    onHoldComplete();
+  }
+}
+
+function cancelHolding() {
+  const t = state.timer;
+  if (t.phase !== 'holding') return;
+  clearTimeout(t.holdTimer);
+  // 恢复之前的状态
+  if (t.prevPhase === 'observing' && t.inspectTimer) {
+    setPhase('observing');
+    timerTime.classList.add('inspecting');
+    timerStatus.textContent = '观察中 — 再次长按进入就绪';
+  } else {
+    setPhase('idle');
+    timerStatus.textContent = '按住空格开始';
+  }
+}
+
+// 长按0.3秒完成：idle→(观察或就绪)，observing→就绪
+function onHoldComplete() {
+  const t = state.timer;
+  if (t.prevPhase === 'observing') {
+    // 观察中第二次长按 → 就绪
+    clearInterval(t.inspectTimer);
+    t.inspectTimer = null;
+    setPhase('ready');
+    timerTime.classList.remove('inspecting');
+    timerTime.classList.add('ready');
+    timerTime.textContent = formatTime(0);
+    timerStatus.textContent = '就绪 — 松开开始';
+  } else if (state.settings.inspectionTime) {
+    // 第一次长按 → 开始观察
+    startInspection();
+  } else {
+    // 无观察模式 → 直接就绪
+    setPhase('ready');
+    timerTime.classList.add('ready');
+    timerTime.textContent = formatTime(0);
+    timerStatus.textContent = '就绪 — 松开开始';
+  }
+}
+
+// ===== 松开空格 =====
+function releaseHold() {
+  const t = state.timer;
+  if (t.phase === 'holding') {
+    cancelHolding();
+    return;
+  }
+  if (t.phase === 'ready') {
+    startTimer();
+  }
+}
+
+function startTimer() {
+  const t = state.timer;
+  setPhase('running');
+  t.startTime = performance.now();
+  t.elapsed = 0;
+  timerTime.classList.remove('ready', 'inspecting');
+  timerTime.classList.add('ticking');
+  timerStatus.textContent = '计时中 — 按空格停止';
+  startRaf();
+  if (state.settings.hideScramble) scrambleText.style.visibility = 'hidden';
+}
+
+function stopTimer() {
+  const t = state.timer;
+  if (t.phase !== 'running') return;
+  stopRaf();
+  t.elapsed = performance.now() - t.startTime;
+  setPhase('stopped');
+  timerTime.classList.remove('ticking');
+  timerStatus.textContent = '已停止';
+  updateTimerDisplay();
+  if (state.settings.hideScramble) scrambleText.style.visibility = '';
+
+  if (state.settings.entryMode === 'auto') {
+    addSolve(t.elapsed);
+    newScramble();
+    timerStatus.textContent = '按住空格开始';
+    setPhase('idle');
+  } else {
+    openManualInput(t.elapsed);
+  }
+}
+
+function resetTimer() {
+  const t = state.timer;
+  stopRaf();
+  clearTimeout(t.holdTimer);
+  clearInterval(t.inspectTimer);
+  t.inspectTimer = null;
+  setPhase('idle');
+  t.elapsed = 0;
+  timerTime.classList.remove('ready', 'ticking', 'inspecting');
+  timerTime.textContent = formatTime(0);
+  timerStatus.textContent = '按住空格开始';
+  if (state.settings.hideScramble) scrambleText.style.visibility = '';
+}
+
+// ===== 手动输入 =====
+function openManualInput(defaultMs) {
+  state.manualPenalty = null;
+  const input = document.getElementById('manualTimeInput');
+  input.value = defaultMs ? formatTime(defaultMs) : '';
+  document.getElementById('manualModal').classList.add('open');
+  setTimeout(() => input.focus(), 50);
+}
+
+function closeManualInput() {
+  document.getElementById('manualModal').classList.remove('open');
+  state.manualPenalty = null;
+}
+
+function confirmManualInput() {
+  const raw = document.getElementById('manualTimeInput').value.trim();
+  if (!raw && !state.manualPenalty) {
+    showToast('请输入成绩');
+    return;
+  }
+
+  let timeMs = 0;
+  let penalty = state.manualPenalty;
+
+  if (raw.toUpperCase() === 'DNF' || penalty === 'dnf') {
+    penalty = 'dnf';
+    timeMs = 0;
+  } else {
+    // 解析 12.34 或 1:23.45
+    const parts = raw.split(':');
+    if (parts.length === 2) {
+      timeMs = (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000;
+    } else {
+      timeMs = parseFloat(raw) * 1000;
+    }
+    if (isNaN(timeMs) || timeMs <= 0) {
+      showToast('格式错误');
+      return;
+    }
+  }
+
+  addSolve(timeMs, penalty);
+  closeManualInput();
+  newScramble();
+  if (state.settings.inspectionTime) startInspection();
+  else timerStatus.textContent = '按住空格开始';
+}
+
+// ===== 成绩管理 =====
+function addSolve(timeMs, penalty) {
+  const solve = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+    time: timeMs,
+    penalty: penalty || null,
+    scramble: state.currentScramble,
+    date: new Date().toISOString(),
+  };
+  if (!state.solves[state.currentProject]) state.solves[state.currentProject] = [];
+  state.solves[state.currentProject].unshift(solve);
+  saveData();
+  renderSolves();
+  renderStats();
+}
+
+function getEffectiveTime(solve) {
+  if (solve.penalty === 'dnf') return Infinity;
+  if (solve.penalty === 'plus2') return solve.time + 2000;
+  return solve.time;
+}
+
+function formatSolveTime(solve) {
+  if (solve.penalty === 'dnf') return 'DNF';
+  const eff = getEffectiveTime(solve);
+  let str = formatTime(eff);
+  if (solve.penalty === 'plus2') str += '+';
+  return str;
+}
+
+function calcAverage(solves, count) {
+  if (solves.length < count) return null;
+  const recent = solves.slice(0, count);
+  const times = recent.map(getEffectiveTime);
+  const dnfCount = times.filter(t => t === Infinity).length;
+  if (dnfCount > 1) return Infinity;
+  const sorted = [...times].sort((a, b) => a - b);
+  const trimmed = sorted.slice(1, -1);
+  if (trimmed.includes(Infinity)) return Infinity;
+  const sum = trimmed.reduce((a, b) => a + b, 0);
+  return sum / trimmed.length;
+}
+
+function calcMean(solves) {
+  const valid = solves.filter(s => s.penalty !== 'dnf');
+  if (valid.length === 0) return null;
+  const sum = valid.reduce((acc, s) => acc + getEffectiveTime(s), 0);
+  return sum / valid.length;
+}
+
+function getBest(solves) {
+  const valid = solves.filter(s => s.penalty !== 'dnf');
+  if (valid.length === 0) return null;
+  return Math.min(...valid.map(getEffectiveTime));
+}
+
+// ===== 渲染 =====
+function renderProjectTabs() {
+  const container = document.getElementById('projectTabs');
+  container.innerHTML = '';
+  PROJECTS.forEach(p => {
+    const tab = document.createElement('div');
+    tab.className = 'project-tab' + (p.id === state.currentProject ? ' active' : '');
+    tab.textContent = p.name;
+    tab.onclick = () => switchProject(p.id);
+    container.appendChild(tab);
+  });
+}
+
+function switchProject(id) {
+  state.currentProject = id;
+  if (!state.solves[id]) state.solves[id] = [];
+  saveData();
+  renderProjectTabs();
+  renderSolves();
+  renderStats();
+  newScramble();
+  resetTimer();
+}
+
+function newScramble() {
+  state.currentScramble = generateScramble(state.currentProject);
+  scrambleText.textContent = state.currentScramble;
+  const proj = PROJECTS.find(p => p.id === state.currentProject);
+  document.getElementById('scrambleLen').textContent = proj ? proj.len + ' 步' : '';
+}
+
+function renderStats() {
+  const solves = state.solves[state.currentProject] || [];
+  const ao5 = calcAverage(solves, 5);
+  const ao12 = calcAverage(solves, 12);
+  const best = getBest(solves);
+  const mean = calcMean(solves);
+
+  document.getElementById('statAo5').textContent = ao5 === null ? '—' : (ao5 === Infinity ? 'DNF' : formatTime(ao5));
+  document.getElementById('statAo5').className = 'stat-value' + (ao5 === Infinity ? ' dnf' : '');
+  document.getElementById('statAo12').textContent = ao12 === null ? '—' : (ao12 === Infinity ? 'DNF' : formatTime(ao12));
+  document.getElementById('statAo12').className = 'stat-value' + (ao12 === Infinity ? ' dnf' : '');
+  document.getElementById('statBest').textContent = best === null ? '—' : formatTime(best);
+  document.getElementById('statMean').textContent = mean === null ? '—' : formatTime(mean);
+  document.getElementById('solvesCount').textContent = solves.length + ' 次';
+}
+
+function renderSolves() {
+  const container = document.getElementById('solvesList');
+  const solves = state.solves[state.currentProject] || [];
+
+  if (solves.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <p>还没有成绩</p>
+        <p style="font-size:10px">按住空格，变绿后松开开始计时</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  solves.forEach((solve, idx) => {
+    const item = document.createElement('div');
+    item.className = 'solve-item' + (solve.id === state.selectedSolveId ? ' selected' : '');
+    item.dataset.id = solve.id;
+
+    const index = document.createElement('span');
+    index.className = 'solve-index';
+    index.textContent = solves.length - idx;
+
+    const time = document.createElement('span');
+    time.className = 'solve-time';
+    if (solve.penalty === 'dnf') time.classList.add('dnf');
+    if (solve.penalty === 'plus2') time.classList.add('plus2');
+    time.textContent = formatSolveTime(solve);
+
+    const date = document.createElement('span');
+    date.className = 'solve-date';
+    date.textContent = formatDate(solve.date);
+
+    const del = document.createElement('span');
+    del.className = 'solve-delete';
+    del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+    del.onclick = (e) => { e.stopPropagation(); deleteSolve(solve.id); };
+
+    item.appendChild(index);
+    item.appendChild(time);
+    item.appendChild(date);
+    item.appendChild(del);
+    item.onclick = () => showSolveDetail(solve.id);
+    container.appendChild(item);
+  });
+}
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) {
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+  }
+  return (d.getMonth()+1) + '/' + d.getDate();
+}
+
+// ===== 成绩详情 =====
+function showSolveDetail(id) {
+  const solves = state.solves[state.currentProject] || [];
+  const solve = solves.find(s => s.id === id);
+  if (!solve) return;
+  state.selectedSolveId = id;
+  renderSolves();
+
+  const body = document.getElementById('detailBody');
+  const d = new Date(solve.date);
+  const dateStr = d.getFullYear() + '-' + (d.getMonth()+1).toString().padStart(2,'0') + '-' + d.getDate().toString().padStart(2,'0') + ' ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+
+  body.innerHTML = `
+    <div class="detail-meta">
+      <div class="detail-meta-item">
+        <div class="stat-label">成绩</div>
+        <div class="stat-value" style="font-size:26px">${formatSolveTime(solve)}</div>
+      </div>
+      <div class="detail-meta-item">
+        <div class="stat-label">时间</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px">${dateStr}</div>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <div class="stat-label">打乱公式</div>
+      <div class="detail-scramble">${solve.scramble || '—'}</div>
+    </div>
+    <div class="detail-actions">
+      <button class="btn ${solve.penalty === 'plus2' ? 'primary' : ''}" data-penalty="plus2">+2</button>
+      <button class="btn ${solve.penalty === 'dnf' ? 'danger' : ''}" data-penalty="dnf">DNF</button>
+      <button class="btn ${solve.penalty === null ? 'primary' : ''}" data-penalty="none">无惩罚</button>
+    </div>
+  `;
+
+  body.querySelectorAll('[data-penalty]').forEach(btn => {
+    btn.onclick = () => {
+      const p = btn.dataset.penalty;
+      solve.penalty = p === 'none' ? null : p;
+      saveData();
+      renderSolves();
+      renderStats();
+      showSolveDetail(id);
+    };
+  });
+
+  document.getElementById('detailModal').classList.add('open');
+}
+
+function deleteSolve(id) {
+  const solves = state.solves[state.currentProject] || [];
+  state.solves[state.currentProject] = solves.filter(s => s.id !== id);
+  if (state.selectedSolveId === id) state.selectedSolveId = null;
+  saveData();
+  renderSolves();
+  renderStats();
+  showToast('已删除');
+}
+
+// ===== 设置 =====
+function openSettings() {
+  document.getElementById('settingInspectionTime').classList.toggle('on', state.settings.inspectionTime);
+  document.getElementById('settingHoldTime').value = state.settings.holdTime;
+  document.getElementById('settingEntryMode').value = state.settings.entryMode;
+  document.getElementById('settingDecimals').value = state.settings.decimals;
+  document.getElementById('settingHideScramble').classList.toggle('on', state.settings.hideScramble);
+  document.getElementById('settingTheme').value = state.settings.theme;
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function applySettings() {
+  state.settings.inspectionTime = document.getElementById('settingInspectionTime').classList.contains('on');
+  state.settings.holdTime = parseFloat(document.getElementById('settingHoldTime').value);
+  state.settings.entryMode = document.getElementById('settingEntryMode').value;
+  state.settings.decimals = parseInt(document.getElementById('settingDecimals').value);
+  state.settings.hideScramble = document.getElementById('settingHideScramble').classList.contains('on');
+  state.settings.theme = document.getElementById('settingTheme').value;
+  saveData();
+  applyTheme();
+  updateTimerDisplay();
+  renderStats();
+  closeSettings();
+  showToast('设置已保存');
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', state.settings.theme);
+}
+
+// ===== 数据导入导出 =====
+function exportData() {
+  const data = JSON.stringify({ solves: state.solves, settings: state.settings }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cc-timer-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('已导出');
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.solves) {
+        Object.keys(data.solves).forEach(pid => {
+          if (!state.solves[pid]) state.solves[pid] = [];
+          const existingIds = new Set(state.solves[pid].map(s => s.id));
+          data.solves[pid].forEach(s => {
+            if (!existingIds.has(s.id)) state.solves[pid].push(s);
+          });
+          state.solves[pid].sort((a,b) => new Date(b.date) - new Date(a.date));
+        });
+      }
+      if (data.settings) Object.assign(state.settings, data.settings);
+      saveData();
+      renderSolves();
+      renderStats();
+      renderProjectTabs();
+      showToast('导入成功');
+    } catch(err) {
+      showToast('导入失败：文件格式错误');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearProject() {
+  if (!confirm('确定清除当前项目的所有成绩？此操作不可恢复。')) return;
+  state.solves[state.currentProject] = [];
+  saveData();
+  renderSolves();
+  renderStats();
+  showToast('已清除');
+}
+
+// ===== Toast =====
+let toastTimer = null;
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ===== 键盘事件 =====
+let spaceDown = false;
+
+document.addEventListener('keydown', (e) => {
+  if (document.querySelector('.modal-overlay.open')) {
+    // 弹窗内的回车处理
+    if (e.code === 'Enter' && document.getElementById('manualModal').classList.contains('open')) {
+      confirmManualInput();
+    }
+    return;
+  }
+  if (e.code === 'Space' && !spaceDown) {
+    e.preventDefault();
+    spaceDown = true;
+    const phase = state.timer.phase;
+    if (phase === 'idle' || phase === 'stopped' || phase === 'observing') {
+      enterHolding();
+    }
+  }
+  if (e.code === 'KeyN' && !e.ctrlKey && !e.metaKey) {
+    newScramble();
+    resetTimer();
+  }
+  if (e.code === 'Escape') {
+    resetTimer();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (document.querySelector('.modal-overlay.open')) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    spaceDown = false;
+    const phase = state.timer.phase;
+    if (phase === 'holding' || phase === 'ready') {
+      releaseHold();
+    } else if (phase === 'running') {
+      stopTimer();
+    }
+  }
+});
+
+window.addEventListener('blur', () => {
+  spaceDown = false;
+  const t = state.timer;
+  if (t.phase === 'holding') {
+    cancelHolding();
+  }
+});
+
+// ===== 触摸支持 =====
+const timerArea = document.getElementById('timerArea');
+let touchActive = false;
+
+timerArea.addEventListener('touchstart', (e) => {
+  if (e.target.closest('.scramble-box') || e.target.closest('.icon-btn')) return;
+  if (document.querySelector('.modal-overlay.open')) return;
+  e.preventDefault();
+  touchActive = true;
+  const phase = state.timer.phase;
+  if (phase === 'idle' || phase === 'stopped' || phase === 'observing') enterHolding();
+}, { passive: false });
+
+timerArea.addEventListener('touchend', (e) => {
+  if (!touchActive) return;
+  e.preventDefault();
+  touchActive = false;
+  const phase = state.timer.phase;
+  if (phase === 'holding' || phase === 'ready') releaseHold();
+  else if (phase === 'running') stopTimer();
+}, { passive: false });
+
+// ===== 事件绑定 =====
+scrambleBox.addEventListener('click', (e) => {
+  if (state.timer.phase === 'running') return;
+  newScramble();
+  resetTimer();
+});
+
+document.getElementById('btnSettings').onclick = openSettings;
+document.getElementById('closeSettings').onclick = closeSettings;
+document.getElementById('btnDoneSettings').onclick = applySettings;
+document.getElementById('settingInspectionTime').onclick = function() { this.classList.toggle('on'); };
+document.getElementById('settingHideScramble').onclick = function() { this.classList.toggle('on'); };
+
+document.getElementById('closeDetail').onclick = () => {
+  document.getElementById('detailModal').classList.remove('open');
+  state.selectedSolveId = null;
+  renderSolves();
+};
+document.getElementById('btnDoneDetail').onclick = () => {
+  document.getElementById('detailModal').classList.remove('open');
+  state.selectedSolveId = null;
+  renderSolves();
+};
+document.getElementById('btnDeleteSolve').onclick = () => {
+  if (state.selectedSolveId) {
+    deleteSolve(state.selectedSolveId);
+    document.getElementById('detailModal').classList.remove('open');
+    state.selectedSolveId = null;
+  }
+};
+
+// 手动输入弹窗
+document.getElementById('closeManual').onclick = closeManualInput;
+document.getElementById('btnConfirmManual').onclick = confirmManualInput;
+document.querySelectorAll('#manualModal [data-penalty]').forEach(btn => {
+  btn.onclick = () => {
+    state.manualPenalty = btn.dataset.penalty;
+    document.querySelectorAll('#manualModal [data-penalty]').forEach(b => b.classList.remove('primary'));
+    btn.classList.add('primary');
+    if (state.manualPenalty === 'dnf') {
+      document.getElementById('manualTimeInput').value = 'DNF';
+    }
+  };
+});
+
+document.getElementById('btnExport').onclick = exportData;
+document.getElementById('btnImport').onclick = () => document.getElementById('importFile').click();
+document.getElementById('importFile').onchange = (e) => {
+  if (e.target.files[0]) importData(e.target.files[0]);
+  e.target.value = '';
+};
+document.getElementById('btnClearProject').onclick = clearProject;
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.classList.remove('open');
+      if (overlay.id === 'detailModal') {
+        state.selectedSolveId = null;
+        renderSolves();
+      }
+    }
+  });
+});
+
+// ===== 初始化 =====
+loadData();
+applyTheme();
+renderProjectTabs();
+renderStats();
+renderSolves();
+newScramble();
+updateTimerDisplay();
+</script>
+</body>
+</html>
