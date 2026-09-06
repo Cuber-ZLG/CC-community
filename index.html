@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CC Timer</title>
 <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ===== 设计 Token ===== */
 :root {
@@ -611,6 +612,17 @@ html, body {
   .scramble-box { padding: 10px 14px; }
   .scramble-text { font-size: 13px; }
 }
+
+/* ===== 登录/云同步 ===== */
+.auth-error { color: var(--danger); font-size: 13px; margin-top: 12px; min-height: 18px; }
+.auth-hint { color: var(--text-faint); font-size: 12px; margin-top: 14px; text-align: center; }
+.auth-user-info { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.auth-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; }
+.auth-email { font-size: 15px; font-weight: 600; }
+.auth-status { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.sync-stats { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; color: var(--text-dim); line-height: 1.8; }
+.sync-stats strong { color: var(--text); }
+#btnAuth.logged-in { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -624,6 +636,9 @@ html, body {
     </div>
     <nav class="project-tabs" id="projectTabs"></nav>
     <div class="topbar-actions">
+      <button class="icon-btn" id="btnAuth" title="登录/云同步">
+        <svg id="authIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </button>
       <button class="icon-btn" id="btnSettings" title="设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
@@ -830,6 +845,48 @@ html, body {
   </div>
 </div>
 
+<!-- ===== 登录/注册弹窗 ===== -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="authModalTitle">登录 / 注册</span>
+      <button class="icon-btn" id="closeAuth">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="authBody">
+      <!-- 未登录状态 -->
+      <div id="authLoginForm">
+        <div class="setting-label">邮箱</div>
+        <input type="email" class="manual-input" id="authEmail" placeholder="you@example.com" autocomplete="email">
+        <div class="setting-label" style="margin-top:16px">密码</div>
+        <input type="password" class="manual-input" id="authPassword" placeholder="至少6位" autocomplete="current-password">
+        <div class="auth-error" id="authError"></div>
+        <div class="modal-footer" style="padding:0;margin-top:20px">
+          <button class="btn primary" id="btnLogin">登录</button>
+          <button class="btn" id="btnRegister">注册新账号</button>
+        </div>
+        <div class="auth-hint">登录后成绩自动云同步，换设备不丢失</div>
+      </div>
+      <!-- 已登录状态 -->
+      <div id="authLoggedIn" style="display:none">
+        <div class="auth-user-info">
+          <div class="auth-avatar" id="authAvatar">U</div>
+          <div>
+            <div class="auth-email" id="authUserEmail"></div>
+            <div class="auth-status">已登录 · 云同步已开启</div>
+          </div>
+        </div>
+        <div class="sync-stats" id="syncStats"></div>
+        <div class="modal-footer" style="padding:0;margin-top:20px">
+          <button class="btn" id="btnSyncNow">立即同步</button>
+          <button class="btn danger" id="btnLogout">退出登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -878,7 +935,180 @@ const state = {
   currentScramble: '',
   selectedSolveId: null,
   manualPenalty: null,
+  user: null,       // 当前登录用户
+  syncing: false,   // 是否正在同步
 };
+
+// ===== Supabase 云同步 =====
+const SUPABASE_URL = 'https://lgpzoawawmqpscebrhdr.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_iT0fDX-C64_4pWUYwMqtxg_sny2x8';
+let supabaseClient = null;
+
+function initSupabase() {
+  if (typeof supabase !== 'undefined' && supabase.createClient) {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true }
+    });
+    return true;
+  }
+  console.warn('Supabase SDK 未加载');
+  return false;
+}
+
+// 检查登录状态
+async function checkAuth() {
+  if (!supabaseClient) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) {
+    state.user = session.user;
+    updateAuthUI();
+    await pullFromCloud();
+  }
+  // 监听登录状态变化
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    state.user = session?.user || null;
+    updateAuthUI();
+    if (state.user) pullFromCloud();
+  });
+}
+
+function updateAuthUI() {
+  const btn = document.getElementById('btnAuth');
+  const loginForm = document.getElementById('authLoginForm');
+  const loggedIn = document.getElementById('authLoggedIn');
+  if (state.user) {
+    btn.classList.add('logged-in');
+    loginForm.style.display = 'none';
+    loggedIn.style.display = 'block';
+    document.getElementById('authUserEmail').textContent = state.user.email;
+    document.getElementById('authAvatar').textContent = state.user.email[0].toUpperCase();
+    updateSyncStats();
+  } else {
+    btn.classList.remove('logged-in');
+    loginForm.style.display = 'block';
+    loggedIn.style.display = 'none';
+  }
+}
+
+function updateSyncStats() {
+  const el = document.getElementById('syncStats');
+  let total = 0;
+  for (const p in state.solves) total += state.solves[p].length;
+  el.innerHTML = `本地成绩：<strong>${total}</strong> 条<br>云同步：<strong>${state.syncing ? '同步中...' : '已开启'}</strong>`;
+}
+
+// 登录
+async function doLogin(email, password) {
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+// 注册
+async function doRegister(email, password) {
+  const { error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) throw error;
+}
+
+// 登出
+async function doLogout() {
+  await supabaseClient.auth.signOut();
+  state.user = null;
+  updateAuthUI();
+  showToast('已退出登录');
+}
+
+// 上传单条成绩到云端
+async function uploadSolve(solve, project) {
+  if (!state.user || !supabaseClient) return;
+  try {
+    await supabaseClient.from('solves').insert({
+      user_id: state.user.id,
+      project: project,
+      time_ms: solve.time,
+      penalty: solve.penalty || 'ok',
+      scramble: solve.scramble || null,
+      created_at: solve.date,
+    });
+  } catch(e) { console.warn('上传成绩失败', e); }
+}
+
+// 把本地所有成绩推到云端（去重）
+async function pushToCloud() {
+  if (!state.user || !supabaseClient) return;
+  state.syncing = true;
+  updateSyncStats();
+  try {
+    // 先拉取云端已有ID去重
+    const { data: existing } = await supabaseClient.from('solves').select('created_at, time_ms, project');
+    const existingSet = new Set(existing?.map(e => `${e.project}|${e.time_ms}|${e.created_at}`));
+    const toInsert = [];
+    for (const project in state.solves) {
+      for (const s of state.solves[project]) {
+        const key = `${project}|${s.time}|${s.date}`;
+        if (!existingSet.has(key)) {
+          toInsert.push({
+            user_id: state.user.id,
+            project,
+            time_ms: s.time,
+            penalty: s.penalty || 'ok',
+            scramble: s.scramble || null,
+            created_at: s.date,
+          });
+        }
+      }
+    }
+    if (toInsert.length > 0) {
+      await supabaseClient.from('solves').insert(toInsert);
+    }
+    showToast(`已同步 ${toInsert.length} 条成绩到云端`);
+  } catch(e) {
+    console.warn('同步失败', e);
+    showToast('同步失败：' + e.message);
+  }
+  state.syncing = false;
+  updateSyncStats();
+}
+
+// 从云端拉取成绩并合并到本地
+async function pullFromCloud() {
+  if (!state.user || !supabaseClient) return;
+  state.syncing = true;
+  updateSyncStats();
+  try {
+    const { data, error } = await supabaseClient.from('solves').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!data || data.length === 0) { state.syncing = false; updateSyncStats(); return; }
+    let added = 0;
+    for (const row of data) {
+      const project = row.project;
+      if (!state.solves[project]) state.solves[project] = [];
+      // 用 time+date 去重
+      const exists = state.solves[project].some(s => s.time === row.time_ms && s.date === row.created_at);
+      if (!exists) {
+        state.solves[project].push({
+          id: row.id,
+          time: row.time_ms,
+          penalty: row.penalty === 'ok' ? null : row.penalty,
+          scramble: row.scramble,
+          date: row.created_at,
+        });
+        added++;
+      }
+    }
+    // 按日期排序
+    for (const p in state.solves) {
+      state.solves[p].sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+    saveData();
+    renderSolves();
+    renderStats();
+    if (added > 0) showToast(`从云端恢复 ${added} 条成绩`);
+  } catch(e) {
+    console.warn('拉取云端数据失败', e);
+  }
+  state.syncing = false;
+  updateSyncStats();
+}
 
 // ===== 存储 =====
 const STORAGE_KEY = 'cc-timer-data';
@@ -1225,6 +1455,8 @@ function addSolve(timeMs, penalty) {
   saveData();
   renderSolves();
   renderStats();
+  // 登录状态下自动上传到云端
+  if (state.user) uploadSolve(solve, state.currentProject);
 }
 
 function getEffectiveTime(solve) {
@@ -1609,6 +1841,48 @@ document.getElementById('btnDoneSettings').onclick = applySettings;
 document.getElementById('settingInspectionTime').onclick = function() { this.classList.toggle('on'); };
 document.getElementById('settingHideScramble').onclick = function() { this.classList.toggle('on'); };
 
+// ===== 登录/云同步事件 =====
+document.getElementById('btnAuth').onclick = () => {
+  document.getElementById('authModal').classList.add('open');
+  updateAuthUI();
+};
+document.getElementById('closeAuth').onclick = () => {
+  document.getElementById('authModal').classList.remove('open');
+};
+document.getElementById('btnLogin').onclick = async () => {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = '请输入邮箱和密码'; return; }
+  try {
+    await doLogin(email, password);
+    document.getElementById('authModal').classList.remove('open');
+    showToast('登录成功');
+  } catch(e) { errEl.textContent = e.message; }
+};
+document.getElementById('btnRegister').onclick = async () => {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = '请输入邮箱和密码'; return; }
+  if (password.length < 6) { errEl.textContent = '密码至少6位'; return; }
+  try {
+    await doRegister(email, password);
+    errEl.style.color = 'var(--accent)';
+    errEl.textContent = '注册成功！请去邮箱验证后登录';
+    errEl.style.color = '';
+  } catch(e) { errEl.textContent = e.message; }
+};
+document.getElementById('btnLogout').onclick = async () => {
+  await doLogout();
+  document.getElementById('authModal').classList.remove('open');
+};
+document.getElementById('btnSyncNow').onclick = async () => {
+  await pushToCloud();
+};
+
 document.getElementById('closeDetail').onclick = () => {
   document.getElementById('detailModal').classList.remove('open');
   state.selectedSolveId = null;
@@ -1669,6 +1943,8 @@ renderStats();
 renderSolves();
 newScramble();
 updateTimerDisplay();
+initSupabase();
+checkAuth();
 </script>
 </body>
 </html>
