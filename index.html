@@ -666,6 +666,79 @@ html, body {
 .role-badge.owner { background: var(--warn-dim); color: var(--warn); }
 .role-badge.admin { background: var(--accent-dim); color: var(--accent); }
 .role-badge.member { background: var(--bg-elev-2); color: var(--text-dim); }
+
+/* ===== 详细统计 + 趋势图 ===== */
+.stats-detail {
+  margin-top: 16px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.stats-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.detail-label { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.5px; }
+.detail-value { font-size: 14px; font-weight: 600; font-family: var(--font-mono); }
+#trendChart { width: 100%; display: block; }
+
+/* ===== 成绩筛选 ===== */
+.solves-filter {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.filter-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-btn:hover { color: var(--text); }
+.filter-btn.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+/* ===== 快捷键提示 ===== */
+.shortcuts-hint {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--bg-elev);
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  z-index: 10;
+}
+.shortcuts-hint kbd {
+  background: var(--bg-elev-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  border: 1px solid var(--border);
+}
 </style>
 </head>
 <body>
@@ -724,6 +797,19 @@ html, body {
           <div class="stat-value" id="statMean">—</div>
         </div>
       </div>
+
+      <!-- 详细统计 + 趋势图 -->
+      <div class="stats-detail">
+        <div class="stats-detail-grid">
+          <div class="detail-item"><span class="detail-label">次数</span><span class="detail-value" id="detailCount">0</span></div>
+          <div class="detail-item"><span class="detail-label">最佳</span><span class="detail-value" id="detailBest">—</span></div>
+          <div class="detail-item"><span class="detail-label">最差</span><span class="detail-value" id="detailWorst">—</span></div>
+          <div class="detail-item"><span class="detail-label">平均</span><span class="detail-value" id="detailMean">—</span></div>
+          <div class="detail-item"><span class="detail-label">标准差</span><span class="detail-value" id="detailStd">—</span></div>
+          <div class="detail-item"><span class="detail-label">DNF率</span><span class="detail-value" id="detailDnf">—</span></div>
+        </div>
+        <canvas id="trendChart" height="70"></canvas>
+      </div>
     </section>
 
     <!-- 右侧成绩列表 -->
@@ -731,6 +817,11 @@ html, body {
       <div class="solves-header">
         <span class="solves-title">成绩记录</span>
         <span class="solves-count" id="solvesCount">0 次</span>
+      </div>
+      <div class="solves-filter">
+        <button class="filter-btn active" data-filter="all">全部</button>
+        <button class="filter-btn" data-filter="today">今天</button>
+        <button class="filter-btn" data-filter="week">本周</button>
       </div>
       <div class="solves-list" id="solvesList">
         <div class="empty-state">
@@ -1056,6 +1147,12 @@ html, body {
 
 <div class="toast" id="toast"></div>
 
+<div class="shortcuts-hint">
+  <span><kbd>空格</kbd> 计时</span>
+  <span><kbd>N</kbd> 新打乱</span>
+  <span><kbd>Esc</kbd> 重置</span>
+</div>
+
 <script>
 // ============================================================
 // CC-community — 魔方社区
@@ -1102,8 +1199,9 @@ const state = {
   currentScramble: '',
   selectedSolveId: null,
   manualPenalty: null,
-  user: null,       // 当前登录用户
-  syncing: false,   // 是否正在同步
+  user: null,
+  syncing: false,
+  solveFilter: 'all', // all / today / week
 };
 
 // ===== Supabase 云同步 + 用户系统 =====
@@ -1172,7 +1270,13 @@ function isNewUser() {
 
 // ===== 验证码登录 =====
 async function sendOtp(email) {
-  const { error } = await supabaseClient.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  const { error } = await supabaseClient.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: 'https://cuber-zlg.github.io/CC-community/'
+    }
+  });
   if (error) throw error;
 }
 
@@ -1907,18 +2011,117 @@ function renderStats() {
   document.getElementById('statBest').textContent = best === null ? '—' : formatTime(best);
   document.getElementById('statMean').textContent = mean === null ? '—' : formatTime(mean);
   document.getElementById('solvesCount').textContent = solves.length + ' 次';
+
+  // 详细统计
+  const valid = solves.filter(s => s.penalty !== 'dnf');
+  const dnfCount = solves.filter(s => s.penalty === 'dnf').length;
+  const worst = valid.length > 0 ? Math.max(...valid.map(getEffectiveTime)) : null;
+  const std = calcStdDev(valid);
+
+  document.getElementById('detailCount').textContent = solves.length;
+  document.getElementById('detailBest').textContent = best === null ? '—' : formatTime(best);
+  document.getElementById('detailWorst').textContent = worst === null ? '—' : formatTime(worst);
+  document.getElementById('detailMean').textContent = mean === null ? '—' : formatTime(mean);
+  document.getElementById('detailStd').textContent = std === null ? '—' : formatTime(std);
+  document.getElementById('detailDnf').textContent = solves.length === 0 ? '—' : (dnfCount / solves.length * 100).toFixed(0) + '%';
+
+  drawTrendChart(solves);
+}
+
+// 标准差
+function calcStdDev(solves) {
+  if (solves.length < 2) return null;
+  const times = solves.map(getEffectiveTime);
+  const mean = times.reduce((a, b) => a + b, 0) / times.length;
+  const variance = times.reduce((sum, t) => sum + Math.pow(t - mean, 2), 0) / times.length;
+  return Math.sqrt(variance);
+}
+
+// 趋势图
+function drawTrendChart(solves) {
+  const canvas = document.getElementById('trendChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 70 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 70;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const valid = solves.filter(s => s.penalty !== 'dnf').slice(0, 50).reverse();
+  if (valid.length < 2) {
+    ctx.fillStyle = 'var(--text-faint)';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('至少需要2次有效成绩', W / 2, H / 2);
+    return;
+  }
+
+  const times = valid.map(getEffectiveTime);
+  const min = Math.min(...times);
+  const max = Math.max(...times);
+  const range = max - min || 1;
+  const pad = 8;
+
+  // 网格线
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 2; i++) {
+    const y = pad + (H - pad * 2) * i / 2;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+
+  // 折线
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4ade80';
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  times.forEach((t, i) => {
+    const x = i / (times.length - 1) * (W - pad * 2) + pad;
+    const y = H - pad - (t - min) / range * (H - pad * 2);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // 数据点
+  ctx.fillStyle = accent;
+  times.forEach((t, i) => {
+    const x = i / (times.length - 1) * (W - pad * 2) + pad;
+    const y = H - pad - (t - min) / range * (H - pad * 2);
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
 }
 
 function renderSolves() {
   const container = document.getElementById('solvesList');
-  const solves = state.solves[state.currentProject] || [];
+  const allSolves = state.solves[state.currentProject] || [];
+  // 筛选
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(todayStart);
+  weekStart.setDate(weekStart.getDate() - 6);
+  let solves = allSolves;
+  if (state.solveFilter === 'today') {
+    solves = allSolves.filter(s => new Date(s.date) >= todayStart);
+  } else if (state.solveFilter === 'week') {
+    solves = allSolves.filter(s => new Date(s.date) >= weekStart);
+  }
 
   if (solves.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <p>还没有成绩</p>
-        <p style="font-size:10px">按住空格，变绿后松开开始计时</p>
+        <p>${allSolves.length === 0 ? '还没有成绩' : '该时段暂无成绩'}</p>
+        <p style="font-size:10px">按住空格开始计时</p>
       </div>`;
     return;
   }
@@ -1993,6 +2196,7 @@ function showSolveDetail(id) {
     <div style="margin-top:14px">
       <div class="stat-label">打乱公式</div>
       <div class="detail-scramble">${solve.scramble || '—'}</div>
+      <button class="btn" id="btnCopyScramble" style="margin-top:8px;font-size:12px;padding:4px 10px">复制打乱</button>
     </div>
     <div class="detail-actions">
       <button class="btn ${solve.penalty === 'plus2' ? 'primary' : ''}" data-penalty="plus2">+2</button>
@@ -2011,6 +2215,17 @@ function showSolveDetail(id) {
       showSolveDetail(id);
     };
   });
+
+  // 复制打乱
+  const copyBtn = document.getElementById('btnCopyScramble');
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(solve.scramble || '').then(() => {
+        copyBtn.textContent = '已复制';
+        setTimeout(() => copyBtn.textContent = '复制打乱', 1500);
+      });
+    };
+  }
 
   document.getElementById('detailModal').classList.add('open');
 }
@@ -2203,6 +2418,16 @@ document.getElementById('closeSettings').onclick = closeSettings;
 document.getElementById('btnDoneSettings').onclick = applySettings;
 document.getElementById('settingInspectionTime').onclick = function() { this.classList.toggle('on'); };
 document.getElementById('settingHideScramble').onclick = function() { this.classList.toggle('on'); };
+
+// ===== 成绩筛选 =====
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.solveFilter = btn.dataset.filter;
+    renderSolves();
+  };
+});
 
 // ===== 认证事件 =====
 document.getElementById('btnAuth').onclick = async () => {
